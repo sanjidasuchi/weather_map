@@ -2,6 +2,7 @@ from flask import Flask, render_template_string
 import requests
 import datetime
 import folium
+import os  # ✅ Added for Railway port handling
 
 app = Flask(__name__)
 
@@ -50,4 +51,5 @@ def index():
     return render_template_string(weather_map._repr_html_())
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # ✅ Read Railway's PORT
+    app.run(host="0.0.0.0", port=port)  # ✅ Listen on all interfaces
