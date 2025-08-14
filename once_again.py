@@ -2,7 +2,7 @@ from flask import Flask, render_template_string
 import requests
 import datetime
 import folium
-import os  # ✅ Added for Railway port handling
+import os  # For Railway port handling
 
 app = Flask(__name__)
 
@@ -17,6 +17,7 @@ def get_weather(city):
         data = r.json()
 
         temp_c = data["main"]["temp"] - 273.15
+        temp_f = temp_c * 9/5 + 32  # Compute Fahrenheit
         humidity = data["main"]["humidity"]
         condition = data["weather"][0]["description"].title()
         lat = data["coord"]["lat"]
@@ -28,6 +29,7 @@ def get_weather(city):
         return {
             "city": city,
             "temp_c": round(temp_c, 2),
+            "temp_f": round(temp_f, 2),
             "humidity": humidity,
             "condition": condition,
             "sunset_local": sunset_local.strftime("%Y-%m-%d %H:%M:%S"),
@@ -41,15 +43,46 @@ def get_weather(city):
 def index():
     # Create map
     weather_map = folium.Map(location=[20, 0], zoom_start=2)
+    temps_c = []  # For average temperature computation
+
     for city in CITIES:
         data = get_weather(city)
         if data:
-            popup_text = f"<b>{data['city']}</b><br>Temp: {data['temp_c']} °C<br>Humidity: {data['humidity']}%<br>Condition: {data['condition']}<br>Sunset: {data['sunset_local']}"
+            temps_c.append(data["temp_c"])
+            popup_text = (
+                f"🌆 <b>{data['city']}</b><br>"
+                f"🌡 Temp: {data['temp_c']} °C / {data['temp_f']} °F<br>"
+                f"💧 Humidity: {data['humidity']}%<br>"
+                f"☁ Condition: {data['condition']}<br>"
+                f"🌅 Sunset: {data['sunset_local']}"
+            )
             folium.Marker([data['lat'], data['lon']], popup=popup_text).add_to(weather_map)
-    
-    # Render map as HTML
-    return render_template_string(weather_map._repr_html_())
+
+    # Compute average temperature
+    if temps_c:
+        avg_c = round(sum(temps_c) / len(temps_c), 2)
+        avg_f = round(avg_c * 9/5 + 32, 2)
+        folium.Marker(
+            [20, 0],  # Central location for average temp
+            popup=f"🌡 <b>Average Temp:</b> {avg_c} °C / {avg_f} °F",
+            icon=folium.Icon(color='green')
+        ).add_to(weather_map)
+
+    # Render map as HTML with UTF-8 encoding for emojis
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Weather Map</title>
+    </head>
+    <body>
+        {weather_map._repr_html_()}
+    </body>
+    </html>
+    """
+    return render_template_string(html_content)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # ✅ Read Railway's PORT
-    app.run(host="0.0.0.0", port=port)  # ✅ Listen on all interfaces
+    port = int(os.environ.get("PORT", 5000))  # Railway port
+    app.run(host="0.0.0.0", port=port)
